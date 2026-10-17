@@ -8,7 +8,7 @@ from langsmith import traceable
 import ollama  # From langchain-ollama
 
 MAX_ITERATIONS = 3  # Your choice
-MODEL = "qwen3.5:0.8b"
+MODEL = "qwen3.5:9b"
 
 # THIS EXAMPLE IS MAINLY FOR OLLAMA, VARIES PER VENDOR
 # WHOLE POINT IS THAT THIS EXAMPLE ISN'T VIABLE TO REPLICATE EVERYTIME, HENCE LANGCHAIN
@@ -57,8 +57,8 @@ toolnames = ", ".join(tools.keys())
 
 # Stays the same but no tools for llm, completely manual this time
 @traceable(name="Ollama Chat", run_type="llm")
-def ollama_chat_trace(messages):
-    return ollama.chat(model=MODEL, messages=messages, options={"temperature": 0})
+def ollama_chat_trace(model, messages, options):
+    return ollama.chat(model=MODEL, messages=messages, options=options)
 
 
 react_prompt = f"""

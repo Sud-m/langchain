@@ -6,7 +6,7 @@ from langsmith import traceable
 import ollama  # From langchain-ollama
 
 MAX_ITERATIONS = 3  # Your choice
-MODEL = "qwen3.5:0.8b"
+MODEL = "qwen3.5:9b"
 
 # THIS EXAMPLE IS MAINLY FOR OLLAMA, VARIES PER VENDOR
 # WHOLE POINT IS THAT THIS EXAMPLE ISN'T VIABLE TO REPLICATE EVERYTIME, HENCE LANGCHAIN
