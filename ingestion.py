@@ -87,6 +87,7 @@ async def async_extract(url_batches):
         style="bold white",
     )
     tasks = [extract_batch(batch, i+1) for i, batch in enumerate(url_batches)]
+    results = await asyncio.gather(*tasks)
 
 async def main():
     """Main async function that orchestrates the whole process"""
