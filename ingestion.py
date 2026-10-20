@@ -3,9 +3,10 @@ from dotenv import load_dotenv
 import os
 import ssl
 from typing import Any, Dict, List
-from rich.console import console
-import openai
+from rich.console import Console
+import json
 
+console = Console()
 load_dotenv()
 
 import asyncio
@@ -86,8 +87,32 @@ async def async_extract(url_batches):
         f"Starting concurrent extraction of {len(url_batches)} batches",
         style="bold white",
     )
-    tasks = [extract_batch(batch, i+1) for i, batch in enumerate(url_batches)]
-    results = await asyncio.gather(*tasks)
+    tasks = [extract_batch(batch, i + 1) for i, batch in enumerate(url_batches)]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    all_pages = []
+    failed_batches = 0
+    for result in results:
+        if isinstance(result, Exception):
+            console.print(f"TavilyExtract: Batch failed with exception: {result}")
+            failed_batches += 1
+        else:
+            for extracted_page in result:
+                document = Document(
+                    page_content=extracted_page["raw_content"],
+                    metadata={"source": extracted_page["url"]},
+                )
+                all_pages.append(document)
+    with open("ingestion_results.json", "w") as f:
+        json.dump(results, f)
+    console.print(
+        f"TavilyExtract: Extraction complete! Total pages extracted: {len(all_pages)}",
+        style="bold green",
+    )
+    if failed_batches > 0:
+        console.print(f"{failed_batches} batche(s) failed. ", style="bold red")
+    return all_pages
+
 
 async def main():
     """Main async function that orchestrates the whole process"""
@@ -126,6 +151,7 @@ async def main():
         f"URL Processing: Split {len(sitemap["results"])} URLs into {len(url_batches)} batches",
         Colors.BLUE,
     )
+    all_docs = await async_extract(url_batches)
 
 
 if __name__ == "__main__":
