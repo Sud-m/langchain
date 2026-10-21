@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 import os
 import ssl
 from typing import Any, Dict, List
+from openai.types import batch
 from rich.console import Console
 import json
 
@@ -48,7 +49,9 @@ vectorstore = PineconeVectorStore(
     index_name=os.environ["INDEX_NAME"], embedding=embeddings
 )
 tavily_extract = TavilyExtract()
-tavily_map = TavilyMap(max_depth=5, max_breadth=20, max_pages=1000)
+tavily_map = TavilyMap(max_depth=5, 
+                       max_breadth=20, # specifies how many links per page to discover
+                       max_pages=1000) 
 tavily_crawl = TavilyCrawl()  # Takes a url and extracts a doc
 
 
@@ -114,6 +117,51 @@ async def async_extract(url_batches):
     return all_pages
 
 
+async def index_documents_async(documents, batch_size=20):
+    """Process documents in batches ascynchronously"""
+    console.print(f"Async Vector Storage Phase", style="bold yellow")
+    console.print(
+        f"VectorStore Indexing: Preparing to add {len(documents)} documents to vector store",
+        style="bold white",
+    )
+    batches = [
+        documents[i : i + batch_size] for i in range(0, len(documents), batch_size)
+    ]
+    console.print(
+        f"Split the documents into {len(batches)} batches of size {batch_size} each",
+        style="bold green",
+    )
+
+    # Process all batches concurrently
+    async def add_batch(batch, batch_num):
+        try:
+            await vectorstore.aadd_documents(batch)
+            console.print(f"Successfully added batch {batch_num}/{len(batches)}")
+            return True
+        except Exception as e:
+            console.print(f"Vector Store failed to add batch {batch_num}: {e}")
+            return False
+
+    tasks = [add_batch(batch, i + 1) for i, batch in enumerate(batches)]
+    # Keep the shared Pinecone session open until every batch has finished.
+    async with vectorstore:
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+    successful = sum(1 for res in results if res == True)
+
+    if successful == len(batches):
+        console.print(
+            "Succesfully added all batches to Vector Store!", style="bold green"
+        )
+    else:
+        console.print(
+            f"Could not add all batches, {successful}/{len(batches)} were added",
+            style="bold red",
+        )
+        raise RuntimeError(
+            f"Incomplete indexing: {successful}/{len(batches)} batches succeeded"
+        )
+
+
 async def main():
     """Main async function that orchestrates the whole process"""
     log_header("DOCUMENTATION INGESTION PIPELINE")
@@ -152,6 +200,26 @@ async def main():
         Colors.BLUE,
     )
     all_docs = await async_extract(url_batches)
+
+    # Split documents into chunks
+    console.print("\nCHUNKING DOCUMENTS\n", style="bold yellow")
+    console.print(
+        f"Text Splitter: Processing {len(all_docs)} documents with 4000 chunk size and 200 overlap size",
+        style="bold green",
+    )
+
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=4000, chunk_overlap=200)
+    splitted_docs = text_splitter.split_documents(all_docs)
+    console.print(
+        f"Text Splitter: Created {len(splitted_docs)} chunks from {len(all_docs)} documents"
+    )
+    await index_documents_async(splitted_docs, batch_size=10)
+
+    console.print("INGESTION COMPLETE", style="bold yellow")
+    console.print("Summary: ", style="bold yellow")
+    console.print(f"    URLs Mapped: {len(sitemap["results"])}", style="bold yellow")
+    console.print(f"    Documents Extracted: {len(all_docs)}", style="bold yellow")
+    console.print(f"    Chunks Created: {len(splitted_docs)}", style="bold yellow")
 
 
 if __name__ == "__main__":
