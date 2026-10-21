@@ -70,7 +70,7 @@ def run_llm(query):
         if isinstance(message, ToolMessage) and hasattr(message, "artifact"):
             # The artifact should contain the list of document objects
             if isinstance(message.artifact, list):
-                context_docs.append(message.artifact)
+                context_docs.extend(message.artifact)
 
     return {"answer": answer, "context": context_docs}
 
