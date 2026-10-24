@@ -12,7 +12,9 @@ dependencies = [
     "isort>=9.0.2",
     "langchain>=1.4.7",
     "langchain-openai>=1.7.2",
+    "langchain-tavily>=0.2.18",
     "langgraph>=1.2.16",
+    "python-dotenv>=1.2.4",
 ]
 
 [project.scripts]
